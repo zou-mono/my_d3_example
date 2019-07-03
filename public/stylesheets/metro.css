@@ -1,0 +1,50 @@
+body {
+    color: white;
+    background-color: #222;
+    background: #222 top left repeat;
+    font-family: 'Raleway', sans-serif;
+}
+
+#selected {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 400px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 7px;
+    opacity: 0;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.subdued {
+    opacity: 0.5;
+}
+
+rect {
+    stroke: none;
+    /*fill: steelblue;*/
+    transition: fill 0.3s;
+}
+
+/*rect:nth-child(even) {*/
+    /*fill: #3F75A2;*/
+/*}*/
+
+rect:hover {
+    cursor: pointer;
+    fill: lightblue;
+    transition: fill 0.3s;
+}
+
+.arc path {
+    stroke: #0A84AE;
+    stroke-width: 1px;
+    stroke-opacity: 75%;
+    fill: none;
+}
+
+.arc:hover path{
+    cursor: pointer;
+    stroke: pink !important;
+}

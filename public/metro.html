@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <!--<script src="js/d3.min.js" type="text/javascript"></script>-->
+    <link href="stylesheets/metro.css" rel="stylesheet"/>
+    <script src="https://d3js.org/d3.v5.min.js" type="text/JavaScript"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.8/d3.min.js" type="text/JavaScript"></script>-->
+</head>
+
+<body>
+<svg height="500" id="station-chart" width="1200"></svg>
+
+<div id="selected"> 鼠标放置在柱子或弧线上可以显示更多信息.</div>
+<script>
+    var station_array = [];
+    var chart_width = 5; //站点chart的宽度
+    var chart_span = 1; //chart之间的间隔
+    var chart_init = 0;
+    var arc_max_height = 380; //弧线的最大高度
+    var station_color = {
+        1: "#006400",
+        2: "#FF9000",
+        3: "#00BFFF",
+        4: "#FF0000",
+        5: "#9A32FF",
+        7: "#0000FF",
+        9: "#8B5F65",
+        11: "#8B0000"
+    };
+
+    // if (!window.maxArcs) {
+    //     var maxArcs = 10;
+    // }
+
+    // 去除重复元素
+    function uniqueArray(arr) {
+        let r = [];
+        if (!arr) return r;
+        for (let i = 0, l = arr.length; i < l; i++) {
+            for (let j = i + 1; j < l; j++) {
+                if (arr[i] === arr[j])
+                    j = ++i;
+            }
+            r.push(arr[i]);
+        }
+        return r;
+    }
+
+    var test=[5,5,4,8,7,5,5,7,6,4];
+    var resss = uniqueArray(test);
+
+    function filterOD(json) {
+        let OD = [];
+        for (let i = 0; i < json.length; i++) {
+            let filterLinks = json[i].LINK.filter(element => element[Object.keys(element)[0]] > 3000);
+            OD.push({
+                ZDMC: json[i].ZDMC,
+                LINK: filterLinks
+            });
+        }
+        return OD;
+    }
+
+
+    function svgParabola(start, end, v) {
+        let r = (end - start) * (chart_width + chart_span) * 0.5;
+        r = r > 0 ? r : -r;
+        let ry = Math.min(v, arc_max_height);
+        let modify =chart_width / 2;
+        let startPos = (start > end) ? (end * (chart_width + chart_span) + modify) : (start * (chart_width + chart_span) + modify);
+        let endPos = (start < end) ? (end * (chart_width + chart_span)-modify) : (start * (chart_width + chart_span)-modify);
+
+        return 'M ' + startPos + ',399 A ' + r + ',' + ry + ' 0 0,1 ' + endPos + ',399 ';
+    }
+
+    //绘制所有的OD弧线
+    function drawTotalArc(station_flow, data) {
+            var maxFLOW = d3.max(data, d => parseInt(d.FLOW));
+            var minFLOW = d3.min(data, d => parseInt(d.FLOW));
+
+            d3.select('#station-chart').selectAll('g')
+                .data(data)
+                .enter().append('g')
+                .attr('class', 'arc')
+                .each(function (d) {
+                    let startArr = station_flow.filter(element => element.ZDMC === d.FROM_STATION); //由于有换乘站，因此有可能会找到多个匹配站点
+                    let endArr = station_flow.filter(element => element.ZDMC === d.TO_STATION);
+
+                    let start = 0;
+                    let end = 0;
+                    for (let i = 0; i < startArr.length; i++) {
+                        start = parseInt(startArr[i].NO);
+                        for (let j = 0; j < endArr.length; j++) {
+                            end = parseInt(endArr[j].NO);
+
+                            var yScale = d3.scaleLinear().domain([minFLOW, maxFLOW]).range([0, arc_max_height]);
+                            let path = svgParabola(start, end, yScale(d.FLOW));
+                            d3.select(this).append('path')
+                                .attr('d', path)
+                        }
+                    }
+                });
+    }
+
+    d3.select('#selected').transition().delay(1000).duration(1000).style('opacity', 1.0);
+
+    d3.csv('data/station_flow.csv').then(function (data) {
+        var station_flow = data;
+
+        for (let i = 0; i < data.length; i++) {
+            // if (station_array.indexOf(data[i].ZDMC) === -1) station_array.push(data[i].ZDMC);
+            station_array.push(data[i].ZDMC);
+        }
+
+        var svg = d3.select('#station-chart');
+        var maxFLOW = d3.max(data, d => parseInt(d.TOTAL_FLOW));
+        var minFLOW = d3.min(data, d => parseInt(d.TOTAL_FLOW));
+        var yScale = d3.scaleLinear().domain([minFLOW, maxFLOW]).range([0, 100]);
+
+        svg.selectAll('rect')
+            .data(data)
+            .enter().append('rect')
+            .attr('x', function (d, i) {
+                return i * (chart_width + chart_span) + chart_init;
+            })
+            .attr('y', 400)
+            .attr('width', chart_width)
+            .attr('height', d => yScale(parseInt(d.TOTAL_FLOW)))
+            .attr('fill', d => station_color[parseInt(d.LineNO)]) //按线路配色
+            // .attr('fill', "#006400")
+            .on('mouseover', function (d) {
+                d3.select('#selected')
+                    .html(d.ZDMC + '<br/><span class="subdued">全天总客流量' +
+                        d.TOTAL_FLOW + '<br/> 全天进站客流量' + d.IN_FLOW +
+                        '<br/> 全天出站客流量' + d.OUT_FLOW);
+            });
+
+        d3.csv('data/OD_flow.csv').then(function (d) {
+            d = d.filter(element => element.FLOW > 3000);
+            drawTotalArc(station_flow, d);
+        });
+
+        d3.selectAll('rect').on('click', function (d) {
+            d3.selectAll('.arc').remove();
+
+            d3.json('data/OD_flow.json').then(function (json) {
+                let stationArr=[];
+                let DArr = json.filter(element=> element.ZDMC === d.ZDMC)[0].LINK;
+                for(let i=0;i < DArr.length;i++){
+                    stationArr.push({
+                        FROM_STATION: d.ZDMC,
+                        TO_STATION: Object.keys(DArr[i])[0],
+                        FLOW: parseInt(DArr[i][Object.keys(DArr[i])[0]])
+                    })
+                }
+                drawTotalArc(station_flow, stationArr);
+            });
+        })
+    });
+</script>
+</body>
+</html>
